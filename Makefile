@@ -1,5 +1,5 @@
-APP_PATH=/home/isucon/webapp/
-GO_PATH=/home/isucon/webapp/go
+APP_PATH=/home/isucon/isubata/webapp/
+GO_PATH=/home/isucon/isubata/webapp/go
 
 APP:=isubata
 DB_HOST:=127.0.0.1
