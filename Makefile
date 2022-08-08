@@ -1,4 +1,4 @@
-APP_PATH=/home/isucon/isubata/webapp/
+APP_PATH=/home/isucon/isubata
 GO_PATH=/home/isucon/isubata/webapp/go
 
 APP:=isubata
