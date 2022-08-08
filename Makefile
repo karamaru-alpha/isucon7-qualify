@@ -78,6 +78,14 @@ sql:
 	mysql -h$(DB_HOST) -P$(DB_PORT) -u$(DB_USER) -p$(DB_PASS) $(DB_NAME)
 	# docker-compose exec mysql bash -c 'mysql -uisucon -pisucon isucari'
 
+.PHONY: schema
+schema:
+	mysqldump -h$(DB_HOST) -P$(DB_PORT) -u$(DB_USER) -p$(DB_PASS) $(DB_NAME) --compact --no-data --compact --no-data | grep -v "^SET" | grep -v "^/\*\!" | perl -ple 's@CREATE TABLE @\nCREATE TABLE @g';
+
+.PHONY: data
+data:
+	mysql -h$(DB_HOST) -P$(DB_PORT) -u$(DB_USER) -p$(DB_PASS) $(DB_NAME) -e 'SELECT table_name, engine, table_rows, floor((data_length+index_length)/1024/1024) AS total_mb, floor((data_length)/1024/1024) AS data_mb, floor((index_length)/1024/1024) AS index_mb FROM information_schema.tables WHERE table_schema=database() ORDER BY (data_length+index_length) DESC;'
+
 .PHONY: log
 log:
 	sudo cat $(GO_LOG)
