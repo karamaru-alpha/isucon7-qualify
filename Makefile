@@ -97,3 +97,7 @@ log-nginx:
 .PHONY: log-sql
 log-sql:
 	sudo cat $(MYSQL_ERR)
+
+.PHONY: bench
+bench:
+	(cd ./bench/ && bin/bench -remotes=127.0.0.1 -output result.json)
