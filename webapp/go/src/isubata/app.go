@@ -202,7 +202,7 @@ func register(name, password string) (int64, error) {
 
 // request handlers
 
-const iconPath = "/home/isucon/isubata/icons"
+const iconPath = "/home/isucon/isubata/webapp/public"
 
 type ImageRow struct {
 	ID   int32  `db:"id"`
