@@ -234,6 +234,10 @@ func getInitialize(c echo.Context) error {
 		}
 	}
 
+	if _, err := db.Exec("UPDATE `channel`, (SELECT channel_id, COUNT(1) AS `message_cnt` FROM `message` GROUP BY channel_id) AS `summary` SET `channel`.`message_cnt`=`summary`.`message_cnt` WHERE channel.id = summary.channel_id"); err != nil {
+		return err
+	}
+
 	return c.String(204, "")
 }
 
@@ -252,6 +256,7 @@ type ChannelInfo struct {
 	ID          int64     `db:"id"`
 	Name        string    `db:"name"`
 	Description string    `db:"description"`
+	MessageCnt  int64     `db:"message_cnt"`
 	UpdatedAt   time.Time `db:"updated_at"`
 	CreatedAt   time.Time `db:"created_at"`
 }
@@ -635,7 +640,7 @@ func postAddChannel(c echo.Context) error {
 	}
 
 	res, err := db.Exec(
-		"INSERT INTO channel (name, description, updated_at, created_at) VALUES (?, ?, NOW(), NOW())",
+		"INSERT INTO channel (name, description, message_cnt, updated_at, created_at) VALUES (?, ?, 0, NOW(), NOW())",
 		name, desc)
 	if err != nil {
 		return err
