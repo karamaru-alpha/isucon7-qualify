@@ -202,12 +202,38 @@ func register(name, password string) (int64, error) {
 
 // request handlers
 
+const iconPath = "/home/isucon/isubata/webapp/public/icons"
+
+type ImageRow struct {
+	ID   int32  `db:"id"`
+	Data []byte `db:"data"`
+	Name string `db:"name"`
+}
+
 func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM user WHERE id > 1000")
 	db.MustExec("DELETE FROM image WHERE id > 1001")
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+
+	if err := os.RemoveAll(iconPath); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(iconPath, os.ModePerm); err != nil {
+		return err
+	}
+
+	images := make([]*ImageRow, 0, 1001)
+	if err := db.Select(&images, "SELECT * FROM image"); err != nil {
+		return err
+	}
+	for _, image := range images {
+		if err := os.WriteFile(fmt.Sprintf("%s/%s", iconPath, image.Name), image.Data, os.ModePerm); err != nil {
+			return err
+		}
+	}
+
 	return c.String(204, "")
 }
 
@@ -660,12 +686,11 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		_, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
+		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
 			return err
 		}
-		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
-		if err != nil {
+		if err := os.WriteFile(fmt.Sprintf("%s/%s", iconPath, avatarName), avatarData, os.ModePerm); err != nil {
 			return err
 		}
 	}
