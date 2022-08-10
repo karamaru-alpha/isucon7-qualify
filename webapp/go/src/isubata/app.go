@@ -469,11 +469,14 @@ func queryHaveRead(userID, chID int64) (int64, error) {
 }
 
 func fetchUnread(c echo.Context) error {
+	log.Println("fetchUnread!")
 	userID := sessUserID(c)
 	if userID == 0 {
+		log.Println("userID == 0!")
 		return c.NoContent(http.StatusForbidden)
 	}
 
+	log.Println("fetchChannels")
 	channels, err := queryChannels()
 	if err != nil {
 		return err
