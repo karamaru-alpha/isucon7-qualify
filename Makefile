@@ -52,7 +52,7 @@ isu1:
 	sudo cp $(APP).conf /etc/nginx/sites-enabled/nginx.conf
 	sudo systemctl stop $(APP).golang.service
 	(cd $(GO_PATH)/src/isubata && go build -o $(APP))
-	mv $(GO_PATH)/src/isubata/$(APP) $(APP)
+	mv $(GO_PATH)/src/isubata/$(APP) $(GO_PATH)
 	sudo rm -f $(NGINX_LOG)
 	sudo rm -f $(NGINX_ERR)
 	sudo rm -f $(MYSQL_LOG)
