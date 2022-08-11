@@ -502,6 +502,7 @@ func fetchUnread(c echo.Context) error {
 
 	haveUnreads, err := queryHaveReads(userID)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	haveUnreadMap := make(map[int64]*HaveRead, len(haveUnreads))
