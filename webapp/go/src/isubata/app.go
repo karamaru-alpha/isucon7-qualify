@@ -483,6 +483,10 @@ func fetchUnread(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	channelMap := make(map[int64]*ChannelInfo, len(channels))
+	for _, channel := range channels {
+		channelMap[channel.ID] = channel
+	}
 
 	resp := []map[string]interface{}{}
 
@@ -498,9 +502,7 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				channel.ID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT message_cnt as cnt FROM channel WHERE id = ?",
-				channel.ID)
+			cnt = int64(channelMap[channel.ID].MessageCnt)
 		}
 		if err != nil {
 			return err
