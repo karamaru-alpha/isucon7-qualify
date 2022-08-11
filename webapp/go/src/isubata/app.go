@@ -452,14 +452,15 @@ func queryChannels() ([]*ChannelInfo, error) {
 	return res, nil
 }
 
+type HaveRead struct {
+	UserID    int64     `db:"user_id"`
+	ChannelID int64     `db:"channel_id"`
+	MessageID int64     `db:"message_id"`
+	UpdatedAt time.Time `db:"updated_at"`
+	CreatedAt time.Time `db:"created_at"`
+}
+
 func queryHaveRead(userID, chID int64) (int64, error) {
-	type HaveRead struct {
-		UserID    int64     `db:"user_id"`
-		ChannelID int64     `db:"channel_id"`
-		MessageID int64     `db:"message_id"`
-		UpdatedAt time.Time `db:"updated_at"`
-		CreatedAt time.Time `db:"created_at"`
-	}
 	h := HaveRead{}
 
 	err := db.Get(&h, "SELECT * FROM haveread WHERE user_id = ? AND channel_id = ?",
@@ -471,6 +472,17 @@ func queryHaveRead(userID, chID int64) (int64, error) {
 		return 0, err
 	}
 	return h.MessageID, nil
+}
+
+func queryHaveReads(userID int64) ([]*HaveRead, error) {
+	h := make([]*HaveRead, 0)
+	err := db.Select(&h, "SELECT * FROM haveread WHERE user_id = ?", userID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return h, nil
 }
 
 func fetchUnread(c echo.Context) error {
@@ -488,12 +500,23 @@ func fetchUnread(c echo.Context) error {
 		channelMap[channel.ID] = channel
 	}
 
+	haveUnreads, err := queryHaveReads(userID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	haveUnreadMap := make(map[int64]*HaveRead, len(haveUnreads))
+	for _, haveUnread := range haveUnreads {
+		haveUnreadMap[haveUnread.ChannelID] = haveUnread
+	}
+
 	resp := []map[string]interface{}{}
 
 	for _, channel := range channels {
-		lastID, err := queryHaveRead(userID, channel.ID)
-		if err != nil {
-			return err
+		var lastID int64
+		haveUnread, ok := haveUnreadMap[channel.ID]
+		if ok {
+			lastID = haveUnread.MessageID
 		}
 
 		var cnt int64
