@@ -409,7 +409,7 @@ func querymessagesWithUsers(chanID, lastID int64, limit, offset int32) ([]*Messa
 	args := []interface{}{chanID}
 	if lastID > 0 {
 		args = append(args, lastID)
-		query += " m.id > ?"
+		query += " AND m.id > ?"
 	}
 	query += " ORDER BY m.id DESC"
 	if limit > 0 {
