@@ -23,6 +23,7 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	log2 "github.com/labstack/gommon/log"
 )
 
 const (
@@ -234,6 +235,13 @@ func getInitialize(c echo.Context) error {
 		}
 	}
 
+	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
+		return err
+	}
+	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
+		return err
+	}
+
 	return c.String(204, "")
 }
 
@@ -252,6 +260,7 @@ type ChannelInfo struct {
 	ID          int64     `db:"id"`
 	Name        string    `db:"name"`
 	Description string    `db:"description"`
+	MessageCnt  int32     `db:"message_cnt"`
 	UpdatedAt   time.Time `db:"updated_at"`
 	CreatedAt   time.Time `db:"created_at"`
 }
@@ -527,7 +536,7 @@ func getHistory(c echo.Context) error {
 
 	const N = 20
 	var cnt int64
-	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
+	err = db.Get(&cnt, "SELECT `message_cnt` as cnt FROM channel WHERE id = ?", chID)
 	if err != nil {
 		return err
 	}
@@ -745,6 +754,15 @@ func tRange(a, b int64) []int64 {
 
 func main() {
 	e := echo.New()
+	log.SetFlags(log.Lshortfile)
+	logfile, err := os.OpenFile("/var/log/go.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		panic("cannnot open test.log:" + err.Error())
+	}
+	log.SetOutput(logfile)
+	log.Print("main!!!!")
+	e.Logger.SetOutput(logfile)
+	e.Logger.SetLevel(log2.ERROR)
 	funcs := template.FuncMap{
 		"add":    tAdd,
 		"xrange": tRange,
@@ -753,9 +771,6 @@ func main() {
 		templates: template.Must(template.New("").Funcs(funcs).ParseGlob("views/*.html")),
 	}
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secretonymoris"))))
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: "request:\"${method} ${uri}\" status:${status} latency:${latency} (${latency_human}) bytes:${bytes_out}\n",
-	}))
 	e.Use(middleware.Static("../public"))
 
 	e.GET("/initialize", getInitialize)
