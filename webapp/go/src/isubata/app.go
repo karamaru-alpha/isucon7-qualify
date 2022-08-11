@@ -476,7 +476,7 @@ func queryHaveRead(userID, chID int64) (int64, error) {
 
 func queryHaveReads(userID int64) ([]*HaveRead, error) {
 	h := make([]*HaveRead, 0)
-	err := db.Get(&h, "SELECT * FROM haveread WHERE user_id = ?", userID)
+	err := db.Select(&h, "SELECT * FROM haveread WHERE user_id = ?", userID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
