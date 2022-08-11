@@ -443,7 +443,7 @@ func getMessage(c echo.Context) error {
 		r["date"] = message.CreatedAt.Format("2006/01/02 15:04:05")
 		r["content"] = message.Content
 
-		response = append(response, r)c
+		response = append(response, r)
 	}
 
 	log.Println("response len: ", len(response))
