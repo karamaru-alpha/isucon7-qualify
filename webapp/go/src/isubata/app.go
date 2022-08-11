@@ -432,10 +432,10 @@ func getMessage(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Println("message len: ", len(messages))
 
 	response := make([]map[string]interface{}, 0, len(messages))
-	for _, message := range messages {
+	for i := len(messages) - 1; i >= 0; i-- {
+		message := messages[i]
 		response = append(response,
 			map[string]interface{}{
 				"id":      message.ID,
@@ -445,8 +445,6 @@ func getMessage(c echo.Context) error {
 			},
 		)
 	}
-
-	log.Println("response len: ", len(response))
 
 	if len(messages) > 0 {
 		_, err := db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
