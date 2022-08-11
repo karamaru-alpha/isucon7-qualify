@@ -402,12 +402,19 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	return r, nil
 }
 
-func querymessagesWithUsers(chanID, lastID int64) ([]*Message, error) {
+func querymessagesWithUsers(chanID, lastID int64, limit, offset int32) ([]*Message, error) {
 	msgs := make([]*Message, 0)
-	if err := db.Select(
-		&msgs,
-		"SELECT m.*, u.name AS `user.name`, u.avatar_icon AS `user.avatar_icon`, u.display_name AS `user.display_name` FROM message m JOIN user u ON m.user_id = u.id WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
-		lastID, chanID); err != nil {
+	query := "SELECT m.*, u.name AS `user.name`, u.avatar_icon AS `user.avatar_icon`, u.display_name AS `user.display_name` FROM message m JOIN user u ON m.user_id = u.id WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC"
+	args := []interface{}{lastID, chanID}
+	if limit > 0 {
+		args = append(args, limit)
+		query += " LIMIT ?"
+	}
+	if offset > 0 {
+		args = append(args, offset)
+		query += " OFFSET ?"
+	}
+	if err := db.Select(&msgs, query, args...); err != nil {
 		return nil, err
 	}
 	return msgs, nil
@@ -428,7 +435,7 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := querymessagesWithUsers(chanID, lastID)
+	messages, err := querymessagesWithUsers(chanID, lastID, 100, 0)
 	if err != nil {
 		return err
 	}
