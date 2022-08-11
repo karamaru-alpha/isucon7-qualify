@@ -234,6 +234,10 @@ func getInitialize(c echo.Context) error {
 		}
 	}
 
+	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
+		return err
+	}
+
 	return c.String(204, "")
 }
 
@@ -252,6 +256,7 @@ type ChannelInfo struct {
 	ID          int64     `db:"id"`
 	Name        string    `db:"name"`
 	Description string    `db:"description"`
+	MessageCnt  int32     `db:"message_cnt"`
 	UpdatedAt   time.Time `db:"updated_at"`
 	CreatedAt   time.Time `db:"created_at"`
 }
