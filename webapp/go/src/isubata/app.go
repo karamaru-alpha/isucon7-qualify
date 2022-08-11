@@ -410,8 +410,6 @@ func querymessagesWithUsers(chanID, lastID int64) ([]*Message, error) {
 		lastID, chanID); err != nil {
 		return nil, err
 	}
-	log.Println("joge")
-	log.Println(len(msgs))
 	return msgs, nil
 }
 
@@ -446,6 +444,8 @@ func getMessage(c echo.Context) error {
 			},
 		)
 	}
+
+	log.Println(len(response))
 
 	if len(messages) > 0 {
 		_, err := db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
