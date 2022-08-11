@@ -410,6 +410,8 @@ func querymessagesWithUsers(chanID, lastID int64) ([]*Message, error) {
 		lastID, chanID); err != nil {
 		return nil, err
 	}
+	log.Println("joge")
+	log.Println(len(msgs))
 	return msgs, nil
 }
 
