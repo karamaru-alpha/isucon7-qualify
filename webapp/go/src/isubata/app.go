@@ -234,6 +234,9 @@ func getInitialize(c echo.Context) error {
 		}
 	}
 
+	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
+		return err
+	}
 	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
 		return err
 	}
