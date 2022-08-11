@@ -444,10 +444,12 @@ func getMessage(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-func queryChannels() ([]int64, error) {
-	res := []int64{}
-	err := db.Select(&res, "SELECT id FROM channel")
-	return res, err
+func queryChannels() ([]*ChannelInfo, error) {
+	res := make([]*ChannelInfo, 0, 100)
+	if err := db.Select(&res, "SELECT * FROM channel"); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func queryHaveRead(userID, chID int64) (int64, error) {
@@ -484,8 +486,8 @@ func fetchUnread(c echo.Context) error {
 
 	resp := []map[string]interface{}{}
 
-	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
+	for _, channel := range channels {
+		lastID, err := queryHaveRead(userID, channel.ID)
 		if err != nil {
 			return err
 		}
@@ -494,17 +496,17 @@ func fetchUnread(c echo.Context) error {
 		if lastID > 0 {
 			err = db.Get(&cnt,
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-				chID, lastID)
+				channel.ID, lastID)
 		} else {
 			err = db.Get(&cnt,
 				"SELECT message_cnt as cnt FROM channel WHERE id = ?",
-				chID)
+				channel.ID)
 		}
 		if err != nil {
 			return err
 		}
 		r := map[string]interface{}{
-			"channel_id": chID,
+			"channel_id": channel.ID,
 			"unread":     cnt}
 		resp = append(resp, r)
 	}
