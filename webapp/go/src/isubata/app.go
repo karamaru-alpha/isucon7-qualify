@@ -23,6 +23,7 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	log2 "github.com/labstack/gommon/log"
 )
 
 const (
@@ -753,6 +754,15 @@ func tRange(a, b int64) []int64 {
 
 func main() {
 	e := echo.New()
+	log.SetFlags(log.Lshortfile)
+	logfile, err := os.OpenFile("/var/log/go.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		panic("cannnot open test.log:" + err.Error())
+	}
+	log.SetOutput(logfile)
+	log.Print("main!!!!")
+	e.Logger.SetOutput(logfile)
+	e.Logger.SetLevel(log2.ERROR)
 	funcs := template.FuncMap{
 		"add":    tAdd,
 		"xrange": tRange,
@@ -761,9 +771,6 @@ func main() {
 		templates: template.Must(template.New("").Funcs(funcs).ParseGlob("views/*.html")),
 	}
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secretonymoris"))))
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: "request:\"${method} ${uri}\" status:${status} latency:${latency} (${latency_human}) bytes:${bytes_out}\n",
-	}))
 	e.Use(middleware.Static("../public"))
 
 	e.GET("/initialize", getInitialize)
