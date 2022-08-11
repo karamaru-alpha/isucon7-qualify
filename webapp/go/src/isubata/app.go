@@ -406,7 +406,7 @@ func querymessagesWithUsers(chanID, lastID int64) ([]*Message, error) {
 	msgs := make([]*Message, 0)
 	if err := db.Select(
 		&msgs,
-		"SELECT m.*, u.name AS `user.name`, u.avatar_icon AS `user.avatar_icon` FROM message m JOIN user u ON m.user_id = u.id WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
+		"SELECT m.*, u.name AS `user.name`, u.avatar_icon AS `user.avatar_icon`, u.display_name AS `user.display_name` FROM message m JOIN user u ON m.user_id = u.id WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
 		lastID, chanID); err != nil {
 		return nil, err
 	}
