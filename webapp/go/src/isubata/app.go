@@ -436,14 +436,14 @@ func getMessage(c echo.Context) error {
 
 	response := make([]map[string]interface{}, len(messages))
 	for _, message := range messages {
-		response = append(response,
-			map[string]interface{}{
-				"id":      message.ID,
-				"user":    message.User,
-				"date":    message.CreatedAt.Format("2006/01/02 15:04:05"),
-				"content": message.Content,
-			},
-		)
+
+		r := make(map[string]interface{})
+		r["id"] = message.ID
+		r["user"] = message.User
+		r["date"] = message.CreatedAt.Format("2006/01/02 15:04:05")
+		r["content"] = message.Content
+
+		response = append(response, r)c
 	}
 
 	log.Println("response len: ", len(response))
