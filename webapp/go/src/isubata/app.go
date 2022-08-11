@@ -434,20 +434,19 @@ func getMessage(c echo.Context) error {
 	}
 	log.Println("message len: ", len(messages))
 
-	response := make([]map[string]interface{}, len(messages))
-	for i := len(messages) - 1; i >= 0; i-- {
-		m := messages[i]
-
-		r := make(map[string]interface{})
-		r["id"] = m.ID
-		r["user"] = m.User
-		r["date"] = m.CreatedAt.Format("2006/01/02 15:04:05")
-		r["content"] = m.Content
-
-		response = append(response, r)
+	response := make([]map[string]interface{}, 0, len(messages))
+	for _, message := range messages {
+		response = append(response,
+			map[string]interface{}{
+				"id":      message.ID,
+				"user":    message.User,
+				"date":    message.CreatedAt.Format("2006/01/02 15:04:05"),
+				"content": message.Content,
+			},
+		)
 	}
 
-	log.Println("response len: ", len(response))
+	fmt.Println("response len: ", len(response))
 
 	if len(messages) > 0 {
 		_, err := db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
