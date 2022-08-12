@@ -653,12 +653,10 @@ func getHistory(c echo.Context) error {
 		})
 	}
 
-	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
+	channels := channelCacher.GetAll()
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].ID < channels[j].ID
+	})
 
 	return c.Render(http.StatusOK, "history", map[string]interface{}{
 		"ChannelID": chID,
@@ -677,12 +675,10 @@ func getProfile(c echo.Context) error {
 		return err
 	}
 
-	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
+	channels := channelCacher.GetAll()
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].ID < channels[j].ID
+	})
 
 	userName := c.Param("user_name")
 	var other User
@@ -711,12 +707,10 @@ func getAddChannel(c echo.Context) error {
 		return err
 	}
 
-	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
+	channels := channelCacher.GetAll()
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].ID < channels[j].ID
+	})
 
 	return c.Render(http.StatusOK, "add_channel", map[string]interface{}{
 		"ChannelID": 0,
