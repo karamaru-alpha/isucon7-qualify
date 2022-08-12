@@ -47,7 +47,7 @@ isu1:
 	git checkout . && git clean -df .
 	git rev-parse --abbrev-ref HEAD | xargs echo "BRANCH:"
 	git rev-parse --abbrev-ref HEAD | xargs git pull origin
-	sudo cp my.cnf /etc/mysql/my.cnf
+	#sudo cp my.cnf /etc/mysql/my.cnf
 	sudo cp nginx.conf /etc/nginx/nginx.conf
 	sudo cp $(APP).conf /etc/nginx/sites-enabled/nginx.conf
 	sudo systemctl stop $(APP).golang.service
@@ -59,8 +59,29 @@ isu1:
 	sudo rm -f $(MYSQL_ERR)
 	sudo cp /dev/null $(GO_LOG)
 	sudo systemctl restart nginx
-	sudo systemctl restart mysql
+	#sudo systemctl restart mysql
 	sudo systemctl start $(APP).golang.service
+
+.PHONY: isu2
+isu2:
+	cd $(APP_PATH)
+	git checkout . && git clean -df .
+	git rev-parse --abbrev-ref HEAD | xargs echo "BRANCH:"
+	git rev-parse --abbrev-ref HEAD | xargs git pull origin
+	sudo cp my.cnf /etc/mysql/my.cnf
+	#sudo cp nginx.conf /etc/nginx/nginx.conf
+	#sudo cp $(APP).conf /etc/nginx/sites-enabled/nginx.conf
+	#sudo systemctl stop $(APP).golang.service
+	#(cd $(GO_PATH)/src/isubata && go build -o $(APP))
+	#mv $(GO_PATH)/src/isubata/$(APP) $(GO_PATH)
+	#sudo rm -f $(NGINX_LOG)
+	#sudo rm -f $(NGINX_ERR)
+	sudo rm -f $(MYSQL_LOG)
+	sudo rm -f $(MYSQL_ERR)
+	#sudo cp /dev/null $(GO_LOG)
+	#sudo systemctl restart nginx
+	sudo systemctl restart mysql
+	#sudo systemctl start $(APP).golang.service
 
 
 .PHONY: slow
