@@ -220,26 +220,31 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM haveread")
 
 	if err := os.RemoveAll(iconPath); err != nil {
-		return err
+		log.Println(err)
 	}
 	if err := os.MkdirAll(iconPath, os.ModePerm); err != nil {
+		log.Println(err)
 		return err
 	}
 
 	images := make([]*ImageRow, 0, 1001)
 	if err := db.Select(&images, "SELECT * FROM image"); err != nil {
+		log.Println(err)
 		return err
 	}
 	for _, image := range images {
 		if err := os.WriteFile(fmt.Sprintf("%s/%s", iconPath, image.Name), image.Data, os.ModePerm); err != nil {
+			log.Println(err)
 			return err
 		}
 	}
 
 	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
+		log.Println(err)
 		return err
 	}
 	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -269,15 +274,18 @@ type ChannelInfo struct {
 func getChannel(c echo.Context) error {
 	user, err := ensureLogin(c)
 	if user == nil {
+		log.Println(err)
 		return err
 	}
 	cID, err := strconv.Atoi(c.Param("channel_id"))
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -317,6 +325,7 @@ func postRegister(c echo.Context) error {
 				return c.NoContent(http.StatusConflict)
 			}
 		}
+		log.Println(err)
 		return err
 	}
 	sessSetUserID(c, userID)
@@ -343,6 +352,7 @@ func postLogin(c echo.Context) error {
 	if err == sql.ErrNoRows {
 		return echo.ErrForbidden
 	} else if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -364,6 +374,7 @@ func getLogout(c echo.Context) error {
 func postMessage(c echo.Context) error {
 	user, err := ensureLogin(c)
 	if user == nil {
+		log.Println(err)
 		return err
 	}
 
@@ -380,6 +391,7 @@ func postMessage(c echo.Context) error {
 	}
 
 	if _, err := addMessage(chanID, user.ID, message); err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -434,15 +446,18 @@ func getMessage(c echo.Context) error {
 
 	chanID, err := strconv.ParseInt(c.QueryParam("channel_id"), 10, 64)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	lastID, err := strconv.ParseInt(c.QueryParam("last_message_id"), 10, 64)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
 	messages, err := querymessagesWithUsers(chanID, lastID, 100, 0)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -465,6 +480,7 @@ func getMessage(c echo.Context) error {
 			" ON DUPLICATE KEY UPDATE message_id = ?, updated_at = NOW()",
 			userID, chanID, messages[0].ID, messages[0].ID)
 		if err != nil {
+			log.Println(err)
 			return err
 		}
 	}
@@ -521,6 +537,7 @@ func fetchUnread(c echo.Context) error {
 
 	channels, err := queryChannels()
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	channelMap := make(map[int64]*ChannelInfo, len(channels))
@@ -530,6 +547,7 @@ func fetchUnread(c echo.Context) error {
 
 	haveUnreads, err := queryHaveReads(userID)
 	if err != nil {
+		log.Println(err)
 		log.Println(err)
 		return err
 	}
@@ -556,6 +574,7 @@ func fetchUnread(c echo.Context) error {
 			cnt = int64(channelMap[channel.ID].MessageCnt)
 		}
 		if err != nil {
+			log.Println(err)
 			return err
 		}
 		r := map[string]interface{}{
@@ -575,6 +594,7 @@ func getHistory(c echo.Context) error {
 
 	user, err := ensureLogin(c)
 	if user == nil {
+		log.Println(err)
 		return err
 	}
 
@@ -593,6 +613,7 @@ func getHistory(c echo.Context) error {
 	var cnt int64
 	err = db.Get(&cnt, "SELECT `message_cnt` as cnt FROM channel WHERE id = ?", chID)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	maxPage := int64(cnt+N-1) / N
@@ -605,6 +626,7 @@ func getHistory(c echo.Context) error {
 
 	messages, err := querymessagesWithUsers(chID, 0, N, int32((page-1)*N))
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -622,6 +644,7 @@ func getHistory(c echo.Context) error {
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -638,12 +661,14 @@ func getHistory(c echo.Context) error {
 func getProfile(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
+		log.Println(err)
 		return err
 	}
 
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -654,6 +679,7 @@ func getProfile(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -669,12 +695,14 @@ func getProfile(c echo.Context) error {
 func getAddChannel(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
+		log.Println(err)
 		return err
 	}
 
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -688,6 +716,7 @@ func getAddChannel(c echo.Context) error {
 func postAddChannel(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
+		log.Println(err)
 		return err
 	}
 
@@ -701,6 +730,7 @@ func postAddChannel(c echo.Context) error {
 		"INSERT INTO channel (name, description, updated_at, created_at) VALUES (?, ?, NOW(), NOW())",
 		name, desc)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	lastID, _ := res.LastInsertId()
@@ -711,6 +741,7 @@ func postAddChannel(c echo.Context) error {
 func postProfile(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
+		log.Println(err)
 		return err
 	}
 
@@ -720,6 +751,7 @@ func postProfile(c echo.Context) error {
 	if fh, err := c.FormFile("avatar_icon"); err == http.ErrMissingFile {
 		// no file upload
 	} else if err != nil {
+		log.Println(err)
 		return err
 	} else {
 		dotPos := strings.LastIndexByte(fh.Filename, '.')
@@ -736,6 +768,7 @@ func postProfile(c echo.Context) error {
 
 		file, err := fh.Open()
 		if err != nil {
+			log.Println(err)
 			return err
 		}
 		avatarData, _ = ioutil.ReadAll(file)
@@ -751,9 +784,11 @@ func postProfile(c echo.Context) error {
 	if avatarName != "" && len(avatarData) > 0 {
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
+			log.Println(err)
 			return err
 		}
 		if err := os.WriteFile(fmt.Sprintf("%s/%s", iconPath, avatarName), avatarData, os.ModePerm); err != nil {
+			log.Println(err)
 			return err
 		}
 	}
@@ -761,6 +796,7 @@ func postProfile(c echo.Context) error {
 	if name := c.FormValue("display_name"); name != "" {
 		_, err := db.Exec("UPDATE user SET display_name = ? WHERE id = ?", name, self.ID)
 		if err != nil {
+			log.Println(err)
 			return err
 		}
 	}
@@ -777,6 +813,7 @@ func getIcon(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
