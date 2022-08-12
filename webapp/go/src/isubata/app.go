@@ -76,9 +76,7 @@ func init() {
 			break
 		}
 		log.Println(err)
-		time.Sleep(
-
-			time.Second * 3)
+		time.Sleep(time.Second * 3)
 	}
 
 	db.SetMaxOpenConns(20)
@@ -123,6 +121,7 @@ type Message struct {
 	UserID    int64     `db:"user_id"`
 	Content   string    `db:"content"`
 	CreatedAt time.Time `db:"created_at"`
+	User      *User     `db:"user"`
 }
 
 func queryMessages(chanID, lastID int64) ([]Message, error) {
@@ -221,28 +220,26 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM haveread")
 
 	if err := os.RemoveAll(iconPath); err != nil {
-
 		return err
 	}
 	if err := os.MkdirAll(iconPath, os.ModePerm); err != nil {
-
 		return err
 	}
 
 	images := make([]*ImageRow, 0, 1001)
 	if err := db.Select(&images, "SELECT * FROM image"); err != nil {
-
 		return err
 	}
 	for _, image := range images {
 		if err := os.WriteFile(fmt.Sprintf("%s/%s", iconPath, image.Name), image.Data, os.ModePerm); err != nil {
-
 			return err
 		}
 	}
 
-	if _, err := db.Exec("UPDATE `channel`, (SELECT channel_id, COUNT(1) AS `message_cnt` FROM `message` GROUP BY channel_id) AS `summary` SET `channel`.`message_cnt`=`summary`.`message_cnt` WHERE channel.id = summary.channel_id"); err != nil {
-
+	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
+		return err
+	}
+	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
 		return err
 	}
 
@@ -264,7 +261,7 @@ type ChannelInfo struct {
 	ID          int64     `db:"id"`
 	Name        string    `db:"name"`
 	Description string    `db:"description"`
-	MessageCnt  int64     `db:"message_cnt"`
+	MessageCnt  int32     `db:"message_cnt"`
 	UpdatedAt   time.Time `db:"updated_at"`
 	CreatedAt   time.Time `db:"created_at"`
 }
@@ -272,18 +269,15 @@ type ChannelInfo struct {
 func getChannel(c echo.Context) error {
 	user, err := ensureLogin(c)
 	if user == nil {
-
 		return err
 	}
 	cID, err := strconv.Atoi(c.Param("channel_id"))
 	if err != nil {
-
 		return err
 	}
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
-
 		return err
 	}
 
@@ -323,7 +317,6 @@ func postRegister(c echo.Context) error {
 				return c.NoContent(http.StatusConflict)
 			}
 		}
-
 		return err
 	}
 	sessSetUserID(c, userID)
@@ -350,7 +343,6 @@ func postLogin(c echo.Context) error {
 	if err == sql.ErrNoRows {
 		return echo.ErrForbidden
 	} else if err != nil {
-
 		return err
 	}
 
@@ -372,7 +364,6 @@ func getLogout(c echo.Context) error {
 func postMessage(c echo.Context) error {
 	user, err := ensureLogin(c)
 	if user == nil {
-
 		return err
 	}
 
@@ -389,7 +380,6 @@ func postMessage(c echo.Context) error {
 	}
 
 	if _, err := addMessage(chanID, user.ID, message); err != nil {
-
 		return err
 	}
 
@@ -412,6 +402,30 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	return r, nil
 }
 
+func querymessagesWithUsers(chanID, lastID int64, limit, offset int32) ([]*Message, error) {
+	msgs := make([]*Message, 0)
+	query := "SELECT m.*, u.name AS `user.name`, u.avatar_icon AS `user.avatar_icon`, u.display_name AS `user.display_name` FROM message m JOIN user u ON m.user_id = u.id WHERE m.channel_id = ?"
+
+	args := []interface{}{chanID}
+	if lastID > 0 {
+		args = append(args, lastID)
+		query += " AND m.id > ?"
+	}
+	query += " ORDER BY m.id DESC"
+	if limit > 0 {
+		args = append(args, limit)
+		query += " LIMIT ?"
+	}
+	if offset > 0 {
+		args = append(args, offset)
+		query += " OFFSET ?"
+	}
+	if err := db.Select(&msgs, query, args...); err != nil {
+		return nil, err
+	}
+	return msgs, nil
+}
+
 func getMessage(c echo.Context) error {
 	userID := sessUserID(c)
 	if userID == 0 {
@@ -420,30 +434,29 @@ func getMessage(c echo.Context) error {
 
 	chanID, err := strconv.ParseInt(c.QueryParam("channel_id"), 10, 64)
 	if err != nil {
-
 		return err
 	}
 	lastID, err := strconv.ParseInt(c.QueryParam("last_message_id"), 10, 64)
 	if err != nil {
-
 		return err
 	}
 
-	messages, err := queryMessages(chanID, lastID)
+	messages, err := querymessagesWithUsers(chanID, lastID, 100, 0)
 	if err != nil {
-
 		return err
 	}
 
-	response := make([]map[string]interface{}, 0)
+	response := make([]map[string]interface{}, 0, len(messages))
 	for i := len(messages) - 1; i >= 0; i-- {
-		m := messages[i]
-		r, err := jsonifyMessage(m)
-		if err != nil {
-
-			return err
-		}
-		response = append(response, r)
+		message := messages[i]
+		response = append(response,
+			map[string]interface{}{
+				"id":      message.ID,
+				"user":    message.User,
+				"date":    message.CreatedAt.Format("2006/01/02 15:04:05"),
+				"content": message.Content,
+			},
+		)
 	}
 
 	if len(messages) > 0 {
@@ -452,7 +465,6 @@ func getMessage(c echo.Context) error {
 			" ON DUPLICATE KEY UPDATE message_id = ?, updated_at = NOW()",
 			userID, chanID, messages[0].ID, messages[0].ID)
 		if err != nil {
-
 			return err
 		}
 	}
@@ -460,20 +472,23 @@ func getMessage(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-func queryChannels() ([]int64, error) {
-	res := []int64{}
-	err := db.Select(&res, "SELECT id FROM channel")
-	return res, err
+func queryChannels() ([]*ChannelInfo, error) {
+	res := make([]*ChannelInfo, 0, 100)
+	if err := db.Select(&res, "SELECT * FROM channel"); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+type HaveRead struct {
+	UserID    int64     `db:"user_id"`
+	ChannelID int64     `db:"channel_id"`
+	MessageID int64     `db:"message_id"`
+	UpdatedAt time.Time `db:"updated_at"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 func queryHaveRead(userID, chID int64) (int64, error) {
-	type HaveRead struct {
-		UserID    int64     `db:"user_id"`
-		ChannelID int64     `db:"channel_id"`
-		MessageID int64     `db:"message_id"`
-		UpdatedAt time.Time `db:"updated_at"`
-		CreatedAt time.Time `db:"created_at"`
-	}
 	h := HaveRead{}
 
 	err := db.Get(&h, "SELECT * FROM haveread WHERE user_id = ? AND channel_id = ?",
@@ -487,6 +502,17 @@ func queryHaveRead(userID, chID int64) (int64, error) {
 	return h.MessageID, nil
 }
 
+func queryHaveReads(userID int64) ([]*HaveRead, error) {
+	h := make([]*HaveRead, 0)
+	err := db.Select(&h, "SELECT * FROM haveread WHERE user_id = ?", userID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
 func fetchUnread(c echo.Context) error {
 	userID := sessUserID(c)
 	if userID == 0 {
@@ -495,35 +521,45 @@ func fetchUnread(c echo.Context) error {
 
 	channels, err := queryChannels()
 	if err != nil {
-
 		return err
+	}
+	channelMap := make(map[int64]*ChannelInfo, len(channels))
+	for _, channel := range channels {
+		channelMap[channel.ID] = channel
+	}
+
+	haveUnreads, err := queryHaveReads(userID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	haveUnreadMap := make(map[int64]*HaveRead, len(haveUnreads))
+	for _, haveUnread := range haveUnreads {
+		haveUnreadMap[haveUnread.ChannelID] = haveUnread
 	}
 
 	resp := []map[string]interface{}{}
 
-	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
-		if err != nil {
-
-			return err
+	for _, channel := range channels {
+		var lastID int64
+		haveUnread, ok := haveUnreadMap[channel.ID]
+		if ok {
+			lastID = haveUnread.MessageID
 		}
 
 		var cnt int64
 		if lastID > 0 {
 			err = db.Get(&cnt,
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-				chID, lastID)
+				channel.ID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
+			cnt = int64(channelMap[channel.ID].MessageCnt)
 		}
 		if err != nil {
-
 			return err
 		}
 		r := map[string]interface{}{
-			"channel_id": chID,
+			"channel_id": channel.ID,
 			"unread":     cnt}
 		resp = append(resp, r)
 	}
@@ -539,7 +575,6 @@ func getHistory(c echo.Context) error {
 
 	user, err := ensureLogin(c)
 	if user == nil {
-
 		return err
 	}
 
@@ -558,7 +593,6 @@ func getHistory(c echo.Context) error {
 	var cnt int64
 	err = db.Get(&cnt, "SELECT `message_cnt` as cnt FROM channel WHERE id = ?", chID)
 	if err != nil {
-
 		return err
 	}
 	maxPage := int64(cnt+N-1) / N
@@ -569,29 +603,25 @@ func getHistory(c echo.Context) error {
 		return ErrBadReqeust
 	}
 
-	messages := []Message{}
-	err = db.Select(&messages,
-		"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
-		chID, N, (page-1)*N)
+	messages, err := querymessagesWithUsers(chID, 0, N, int32((page-1)*N))
 	if err != nil {
-
 		return err
 	}
 
-	mjson := make([]map[string]interface{}, 0)
+	mjson := make([]map[string]interface{}, 0, len(messages))
 	for i := len(messages) - 1; i >= 0; i-- {
-		r, err := jsonifyMessage(messages[i])
-		if err != nil {
-
-			return err
-		}
-		mjson = append(mjson, r)
+		message := messages[i]
+		mjson = append(mjson, map[string]interface{}{
+			"id":      message.ID,
+			"user":    message.User,
+			"date":    message.CreatedAt.Format("2006/01/02 15:04:05"),
+			"content": message.Content,
+		})
 	}
 
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
-
 		return err
 	}
 
@@ -608,14 +638,12 @@ func getHistory(c echo.Context) error {
 func getProfile(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
-
 		return err
 	}
 
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
-
 		return err
 	}
 
@@ -626,7 +654,6 @@ func getProfile(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if err != nil {
-
 		return err
 	}
 
@@ -642,14 +669,12 @@ func getProfile(c echo.Context) error {
 func getAddChannel(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
-
 		return err
 	}
 
 	channels := []ChannelInfo{}
 	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
 	if err != nil {
-
 		return err
 	}
 
@@ -663,7 +688,6 @@ func getAddChannel(c echo.Context) error {
 func postAddChannel(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
-
 		return err
 	}
 
@@ -674,10 +698,9 @@ func postAddChannel(c echo.Context) error {
 	}
 
 	res, err := db.Exec(
-		"INSERT INTO channel (name, description, message_cnt, updated_at, created_at) VALUES (?, ?, 0, NOW(), NOW())",
+		"INSERT INTO channel (name, description, updated_at, created_at) VALUES (?, ?, NOW(), NOW())",
 		name, desc)
 	if err != nil {
-
 		return err
 	}
 	lastID, _ := res.LastInsertId()
@@ -688,7 +711,6 @@ func postAddChannel(c echo.Context) error {
 func postProfile(c echo.Context) error {
 	self, err := ensureLogin(c)
 	if self == nil {
-
 		return err
 	}
 
@@ -698,7 +720,6 @@ func postProfile(c echo.Context) error {
 	if fh, err := c.FormFile("avatar_icon"); err == http.ErrMissingFile {
 		// no file upload
 	} else if err != nil {
-
 		return err
 	} else {
 		dotPos := strings.LastIndexByte(fh.Filename, '.')
@@ -715,7 +736,6 @@ func postProfile(c echo.Context) error {
 
 		file, err := fh.Open()
 		if err != nil {
-
 			return err
 		}
 		avatarData, _ = ioutil.ReadAll(file)
@@ -731,11 +751,9 @@ func postProfile(c echo.Context) error {
 	if avatarName != "" && len(avatarData) > 0 {
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
-
 			return err
 		}
 		if err := os.WriteFile(fmt.Sprintf("%s/%s", iconPath, avatarName), avatarData, os.ModePerm); err != nil {
-
 			return err
 		}
 	}
@@ -743,7 +761,6 @@ func postProfile(c echo.Context) error {
 	if name := c.FormValue("display_name"); name != "" {
 		_, err := db.Exec("UPDATE user SET display_name = ? WHERE id = ?", name, self.ID)
 		if err != nil {
-
 			return err
 		}
 	}
@@ -760,7 +777,6 @@ func getIcon(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if err != nil {
-
 		return err
 	}
 
@@ -792,7 +808,6 @@ func tRange(a, b int64) []int64 {
 
 func main() {
 	e := echo.New()
-
 	log.SetFlags(log.Lshortfile)
 	logfile, err := os.OpenFile("/var/log/go.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -802,7 +817,6 @@ func main() {
 	log.Print("main!!!!")
 	e.Logger.SetOutput(logfile)
 	e.Logger.SetLevel(log2.ERROR)
-
 	funcs := template.FuncMap{
 		"add":    tAdd,
 		"xrange": tRange,
