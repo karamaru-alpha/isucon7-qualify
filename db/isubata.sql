@@ -19,9 +19,14 @@ CREATE TABLE channel (
   id BIGINT AUTO_INCREMENT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,
   description MEDIUMTEXT,
+  message_cnt INT UNSIGNED NOT NULL DEFAULT 0,
   updated_at DATETIME NOT NULL,
   created_at DATETIME NOT NULL
 ) Engine=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TRIGGER tr1 BEFORE INSERT ON `message` FOR EACH ROW UPDATE `channel` SET `message_cnt`=`message_cnt`+1  WHERE id = NEW.message.channel_id;
+CREATE TRIGGER tr2 BEFORE DELETE ON `message` FOR EACH ROW UPDATE `channel` SET `message_cnt`=`message_cnt`-1 WHERE id = OLD.message.channel_id;
 
 CREATE TABLE message (
   id BIGINT AUTO_INCREMENT NOT NULL PRIMARY KEY,
