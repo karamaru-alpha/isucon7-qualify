@@ -499,11 +499,7 @@ func getMessage(c echo.Context) error {
 }
 
 func queryChannels() ([]*ChannelInfo, error) {
-	res := make([]*ChannelInfo, 0, 100)
-	if err := db.Select(&res, "SELECT * FROM channel"); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return channelCacher.GetAll(), nil
 }
 
 type HaveRead struct {
