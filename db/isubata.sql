@@ -42,4 +42,4 @@ CREATE TABLE haveread (
 
 ALTER TABLE `message` ADD INDEX (`channel_id`);
 ALTER TABLE `channel` ADD COLUMN message_cnt INT UNSIGNED NOT NULL DEFAULT 0;
-CREATE TRIGGER tr1 BEFORE INSERT ON `message` FOR EACH ROW UPDATE `channel` SET `message_cnt`=`message_cnt`+1 WHERE id = NEW.message.channel_id;
+CREATE TRIGGER tr1 BEFORE INSERT ON `message` FOR EACH ROW UPDATE `channel` SET `message_cnt`=`message_cnt`+1 WHERE id = NEW.channel_id;
