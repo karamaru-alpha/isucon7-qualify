@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -112,6 +113,7 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	channelCacher.IncrementMessage(string(channelID))
 	return res.LastInsertId()
 }
 
@@ -239,6 +241,7 @@ func getInitialize(c echo.Context) error {
 		}
 	}
 
+	channelCacher = initCannelCacher()
 	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
 		log.Println(err)
 		return err
@@ -246,6 +249,14 @@ func getInitialize(c echo.Context) error {
 	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
 		log.Println(err)
 		return err
+	}
+	channels := make([]*ChannelInfo, 0, 100)
+	if err := db.Select(&channels, "SELECT * FROM channel"); err != nil {
+		log.Println(err)
+		return err
+	}
+	for _, channel := range channels {
+		channelCacher.Set(string(channel.ID), channel, -1)
 	}
 
 	return c.String(204, "")
@@ -726,14 +737,19 @@ func postAddChannel(c echo.Context) error {
 		return ErrBadReqeust
 	}
 
+	now := time.Now()
 	res, err := db.Exec(
-		"INSERT INTO channel (name, description, updated_at, created_at) VALUES (?, ?, NOW(), NOW())",
-		name, desc)
+		"INSERT INTO channel (name, description, updated_at, created_at) VALUES (?, ?, ?, ?)",
+		name, desc, now, now)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+
 	lastID, _ := res.LastInsertId()
+
+	channelCacher.Set(string(lastID), &ChannelInfo{ID: lastID, Name: name, Description: desc, MessageCnt: 0, UpdatedAt: now, CreatedAt: now}, -1)
+
 	return c.Redirect(http.StatusSeeOther,
 		fmt.Sprintf("/channel/%v", lastID))
 }
@@ -887,3 +903,81 @@ func main() {
 
 	e.Start(":5000")
 }
+
+type Cacher[T any] struct {
+	Mutex sync.RWMutex
+	Cache map[string]struct {
+		Value   T
+		Expired time.Time
+	}
+}
+
+func (c *Cacher[T]) Get(key string) (T, bool) {
+	c.Mutex.RLock()
+	cache, ok := c.Cache[key]
+	c.Mutex.RUnlock()
+	if ok && (cache.Expired.IsZero() || time.Now().Before(cache.Expired)) {
+		return cache.Value, true
+	}
+	var defaultValue T
+	return defaultValue, false
+}
+
+func (c *Cacher[T]) Set(key string, value T, ttl time.Duration) {
+	c.Mutex.Lock()
+	var expired time.Time
+	if ttl > 0 {
+		expired = time.Now().Add(ttl)
+	}
+	c.Cache[key] = struct {
+		Value   T
+		Expired time.Time
+	}{
+		Value:   value,
+		Expired: expired,
+	}
+	c.Mutex.Unlock()
+}
+
+func (c *Cacher[T]) Delete(key string) {
+	c.Mutex.Lock()
+	delete(c.Cache, key)
+	c.Mutex.Unlock()
+}
+
+func (c *Cacher[T]) Flush() {
+	c.Mutex.Lock()
+	c.Cache = make(map[string]struct {
+		Value   T
+		Expired time.Time
+	})
+	c.Mutex.Unlock()
+}
+
+type ChannelCacher struct {
+	*Cacher[*ChannelInfo]
+}
+
+func (c *ChannelCacher) IncrementMessage(key string) {
+	c.Mutex.Lock()
+	cache, ok := c.Cacher.Cache[key]
+	if !ok {
+		c.Mutex.Unlock()
+		return
+	}
+	cache.Value.MessageCnt++
+	c.Mutex.Unlock()
+}
+
+func initCannelCacher() ChannelCacher {
+	return ChannelCacher{
+		Cacher: &Cacher[*ChannelInfo]{
+			Cache: make(map[string]struct {
+				Value   *ChannelInfo
+				Expired time.Time
+			}, 0),
+		},
+	}
+}
+
+var channelCacher = initCannelCacher()
