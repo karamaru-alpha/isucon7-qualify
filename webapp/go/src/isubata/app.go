@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -293,12 +294,10 @@ func getChannel(c echo.Context) error {
 		log.Println(err)
 		return err
 	}
-	channels := []ChannelInfo{}
-	err = db.Select(&channels, "SELECT * FROM channel ORDER BY id")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
+	channels := channelCacher.GetAll()
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].ID < channels[j].ID
+	})
 
 	var desc string
 	for _, ch := range channels {
@@ -925,14 +924,14 @@ func (c *Cacher[T]) Get(key string) (T, bool) {
 	return defaultValue, false
 }
 
-func (c *Cacher[T]) GetAll() ([]T, bool) {
+func (c *Cacher[T]) GetAll() []T {
 	c.Mutex.RLock()
 	slice := make([]T, 0, len(c.Cache))
 	for _, v := range c.Cache {
 		slice = append(slice, v.Value)
 	}
 	c.Mutex.RUnlock()
-	return slice, false
+	return slice
 }
 
 func (c *Cacher[T]) Set(key string, value T, ttl time.Duration) {
