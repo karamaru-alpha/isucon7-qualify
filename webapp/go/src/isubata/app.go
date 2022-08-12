@@ -618,12 +618,6 @@ func getHistory(c echo.Context) error {
 	const N = 20
 	channel, _ := channelCacher.Get(string(chID))
 	cnt := channel.MessageCnt
-	//err = db.Get(&cnt, "SELECT `message_cnt` as cnt FROM channel WHERE id = ?", chID)
-	//if err != nil {
-	//	log.Println(err)
-	//	return err
-	//}
-	//
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
