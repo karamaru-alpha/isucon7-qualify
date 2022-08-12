@@ -621,12 +621,14 @@ func getHistory(c echo.Context) error {
 	}
 
 	const N = 20
-	var cnt int64
-	err = db.Get(&cnt, "SELECT `message_cnt` as cnt FROM channel WHERE id = ?", chID)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
+	channel, _ := channelCacher.Get(string(chID))
+	cnt := channel.MessageCnt
+	//err = db.Get(&cnt, "SELECT `message_cnt` as cnt FROM channel WHERE id = ?", chID)
+	//if err != nil {
+	//	log.Println(err)
+	//	return err
+	//}
+	//
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
@@ -921,6 +923,16 @@ func (c *Cacher[T]) Get(key string) (T, bool) {
 	}
 	var defaultValue T
 	return defaultValue, false
+}
+
+func (c *Cacher[T]) GetAll() ([]T, bool) {
+	c.Mutex.RLock()
+	slice := make([]T, 0, len(c.Cache))
+	for _, v := range c.Cache {
+		slice = append(slice, v.Value)
+	}
+	c.Mutex.RUnlock()
+	return slice, false
 }
 
 func (c *Cacher[T]) Set(key string, value T, ttl time.Duration) {
