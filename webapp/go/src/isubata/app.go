@@ -102,8 +102,8 @@ func getUser(userID int64) (*User, error) {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		fmt.Println(err)
-		fmt.Println(err)
+		log.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	return &u, nil
@@ -166,7 +166,7 @@ func ensureLogin(c echo.Context) (*User, error) {
 
 	user, err = getUser(userID)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	if user == nil {
@@ -416,7 +416,7 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
 		m.UserID)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 
@@ -447,7 +447,7 @@ func querymessagesWithUsers(chanID, lastID int64, limit, offset int32) ([]*Messa
 		query += " OFFSET ?"
 	}
 	if err := db.Select(&msgs, query, args...); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	return msgs, nil
@@ -535,7 +535,7 @@ func queryHaveReads(userID int64) ([]*HaveRead, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	return h, nil
@@ -599,7 +599,7 @@ func fetchUnread(c echo.Context) error {
 }
 
 func getHistory(c echo.Context) error {
-	fmt.Println("start of history")
+	log.Println("start of history")
 	chID, err := strconv.ParseInt(c.Param("channel_id"), 10, 64)
 	if err != nil || chID <= 0 {
 		return ErrBadReqeust
@@ -655,7 +655,7 @@ func getHistory(c echo.Context) error {
 		return channels[i].ID < channels[j].ID
 	})
 
-	fmt.Println("end of history")
+	log.Println("end of history")
 
 	return c.Render(http.StatusOK, "history", map[string]interface{}{
 		"ChannelID": chID,
