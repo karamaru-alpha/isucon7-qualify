@@ -103,6 +103,7 @@ func getUser(userID int64) (*User, error) {
 			return nil, nil
 		}
 		fmt.Println(err)
+		fmt.Println(err)
 		return nil, err
 	}
 	return &u, nil
@@ -165,6 +166,7 @@ func ensureLogin(c echo.Context) (*User, error) {
 
 	user, err = getUser(userID)
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 	if user == nil {
@@ -414,6 +416,7 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
 		m.UserID)
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 
@@ -444,6 +447,7 @@ func querymessagesWithUsers(chanID, lastID int64, limit, offset int32) ([]*Messa
 		query += " OFFSET ?"
 	}
 	if err := db.Select(&msgs, query, args...); err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 	return msgs, nil
@@ -531,6 +535,7 @@ func queryHaveReads(userID int64) ([]*HaveRead, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 	return h, nil
