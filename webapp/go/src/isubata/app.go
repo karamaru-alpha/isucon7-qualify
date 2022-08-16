@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"crypto/sha1"
 	"database/sql"
@@ -19,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bytedance/sonic/decoder"
+	"github.com/bytedance/sonic/encoder"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -27,6 +30,23 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	log2 "github.com/labstack/gommon/log"
 )
+
+type JSONSerializer struct{}
+
+func (j *JSONSerializer) Serialize(c echo.Context, i interface{}, indent string) error {
+	buf, err := encoder.Encode(i, 0)
+	if err != nil {
+		return err
+	}
+	_, err = c.Response().Write(buf)
+	return err
+}
+
+func (j *JSONSerializer) Deserialize(c echo.Context, i interface{}) error {
+	var buf bytes.Buffer
+	buf.ReadFrom(c.Request().Body)
+	return decoder.NewDecoder(buf.String()).Decode(i)
+}
 
 const (
 	avatarMaxBytes = 1 * 1024 * 1024
@@ -886,6 +906,7 @@ func tRange(a, b int64) []int64 {
 
 func main() {
 	e := echo.New()
+	e.JSONSerializer = &JSONSerializer{}
 	log.SetFlags(log.Lshortfile)
 	logfile, err := os.OpenFile("/var/log/go.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
