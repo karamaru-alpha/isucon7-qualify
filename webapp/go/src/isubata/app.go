@@ -263,6 +263,38 @@ func getInitialize(c echo.Context) error {
 		channelCacher.Set(string(channel.ID), channel, -1)
 	}
 
+	req, err := http.NewRequestWithContext(c.Request().Context(), http.MethodGet, "http://172.31.5.58:5000/initialize/isu3", nil)
+	if err != nil {
+		panic(err)
+	}
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return c.String(204, "")
+}
+
+func getInitializeIsu3(c echo.Context) error {
+	log.Println("getInitializeIsu3")
+	channelCacher = initCannelCacher()
+	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
+		log.Println(err)
+		return err
+	}
+	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
+		log.Println(err)
+		return err
+	}
+	channels := make([]*ChannelInfo, 0, 100)
+	if err := db.Select(&channels, "SELECT * FROM channel"); err != nil {
+		log.Println(err)
+		return err
+	}
+	for _, channel := range channels {
+		channelCacher.Set(string(channel.ID), channel, -1)
+	}
+
 	return c.String(204, "")
 }
 
@@ -878,6 +910,7 @@ func main() {
 	e.Use(middleware.Static("../public"))
 
 	e.GET("/initialize", getInitialize)
+	e.GET("/initialize/isu3", getInitializeIsu3)
 	e.GET("/", getIndex)
 	e.GET("/register", getRegister)
 	e.POST("/register", postRegister)
