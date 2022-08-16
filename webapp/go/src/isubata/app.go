@@ -623,8 +623,11 @@ func getHistory(c echo.Context) error {
 	}
 
 	const N = 20
-	channel, _ := channelCacher.Get(string(chID))
-	cnt := channel.MessageCnt
+	var cnt int32
+	channel, ok := channelCacher.Get(string(chID))
+	if ok {
+		cnt = channel.MessageCnt
+	}
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
