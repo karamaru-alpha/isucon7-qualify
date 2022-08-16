@@ -102,6 +102,7 @@ func getUser(userID int64) (*User, error) {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
+		fmt.Println(err)
 		return nil, err
 	}
 	return &u, nil
