@@ -102,6 +102,8 @@ func getUser(userID int64) (*User, error) {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
+		log.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	return &u, nil
@@ -164,6 +166,7 @@ func ensureLogin(c echo.Context) (*User, error) {
 
 	user, err = getUser(userID)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	if user == nil {
@@ -242,6 +245,37 @@ func getInitialize(c echo.Context) error {
 		}
 	}
 
+	channelCacher = initCannelCacher()
+	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
+		log.Println(err)
+		return err
+	}
+	if _, err := db.Exec("UPDATE channel, (SELECT channel_id, COUNT(*) AS `cnt` FROM message GROUP BY channel_id) AS summary SET `channel`.`message_cnt`=`summary`.`cnt` WHERE `channel`.`id` = `summary`.`channel_id`"); err != nil {
+		log.Println(err)
+		return err
+	}
+	channels := make([]*ChannelInfo, 0, 100)
+	if err := db.Select(&channels, "SELECT * FROM channel"); err != nil {
+		log.Println(err)
+		return err
+	}
+	for _, channel := range channels {
+		channelCacher.Set(string(channel.ID), channel, -1)
+	}
+
+	req, err := http.NewRequestWithContext(c.Request().Context(), http.MethodGet, "http://172.31.5.58:5000/initialize/isu3", nil)
+	if err != nil {
+		panic(err)
+	}
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return c.String(204, "")
+}
+
+func getInitializeIsu3(c echo.Context) error {
 	channelCacher = initCannelCacher()
 	if _, err := db.Exec("UPDATE channel SET `message_cnt`=0"); err != nil {
 		log.Println(err)
@@ -413,6 +447,7 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
 		m.UserID)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 
@@ -443,6 +478,7 @@ func querymessagesWithUsers(chanID, lastID int64, limit, offset int32) ([]*Messa
 		query += " OFFSET ?"
 	}
 	if err := db.Select(&msgs, query, args...); err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return msgs, nil
@@ -530,6 +566,7 @@ func queryHaveReads(userID int64) ([]*HaveRead, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return h, nil
@@ -616,8 +653,11 @@ func getHistory(c echo.Context) error {
 	}
 
 	const N = 20
-	channel, _ := channelCacher.Get(string(chID))
-	cnt := channel.MessageCnt
+	var cnt int32
+	channel, ok := channelCacher.Get(string(chID))
+	if ok {
+		cnt = channel.MessageCnt
+	}
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
@@ -866,6 +906,7 @@ func main() {
 	e.Use(middleware.Static("../public"))
 
 	e.GET("/initialize", getInitialize)
+	e.GET("/initialize/isu3", getInitializeIsu3)
 	e.GET("/", getIndex)
 	e.GET("/register", getRegister)
 	e.POST("/register", postRegister)
